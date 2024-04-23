@@ -60,6 +60,10 @@ if "sidebar_emoji" not in mystate: mystate.sidebar_emoji = ''
 if "emoji_bank" not in mystate: mystate.emoji_bank = []
 if "GameDetails" not in mystate: mystate.GameDetails = ['Medium', 6, 7, '']  # difficulty level, sec interval for autogen, total_cells_per_row_or_col, player name
 
+#se agregan dos estados nuevos al juego: el estado de intentos incorrectos y de finalización en caso de perder, estas variables estarán presentes en la función NewGame y pressedCheck
+if "wrong_attempts" not in mystate: mystate.wrong_attempts = 0
+if "game_over" not in mystate: mystate.game_over = False
+
 
 def ReduceGapFromPageTop(wch_section = 'main page'):  # Ajusta el espacio superior de la página principal o la barra lateral para mejorar la estética.
 
@@ -91,9 +95,9 @@ def Leaderboard(what_to_do): #Gestiona un leaderboard leyendo y escribiendo en u
                 leaderboard[str(leaderboard_dict_lngth + 1)] = {'NameCountry': mystate.GameDetails[3], 'HighestScore': mystate.myscore} 
                 leaderboard = dict(sorted(leaderboard.items(), key=lambda item: item[1]['HighestScore'], reverse=True))  # # Ordena el diccionario de líderes por puntaje más alto de forma descendente
 
-                # Si hay más de 3 registros en el tablero, elimina los últimos.
-                if len(leaderboard) > 3:
-                    for i in range(len(leaderboard)-3): leaderboard.popitem()    # rmv last kdict ey
+                # Si hay más de 3 registros en el tablero, elimina los últimos. (corregido para los últimos 4 jugadores)
+                if len(leaderboard) > 4:
+                    for i in range(len(leaderboard)-4 ): leaderboard.popitem()    
 
                 # Guarda el diccionario actualizado de nuevo en el archivo JSON.
                 json.dump(leaderboard, open(vpth + 'leaderboard.json', 'w'))     # write file
@@ -105,7 +109,7 @@ def Leaderboard(what_to_do): #Gestiona un leaderboard leyendo y escribiendo en u
                     
                 leaderboard = dict(sorted(leaderboard.items(), key=lambda item: item[1]['HighestScore'], reverse=True))  # sort desc
 
-                sc0, sc1, sc2, sc3 = st.columns((2,3,3,3))
+                sc0, sc1, sc2, sc3, sc4 = st.columns((2,3,3,3,3))
                 rknt = 0
 
                 ## Configura la presentación visual de los mejores puntajes en columnas.
@@ -117,6 +121,8 @@ def Leaderboard(what_to_do): #Gestiona un leaderboard leyendo y escribiendo en u
                             sc1.write(f"🥇 | {leaderboard[vkey]['NameCountry']}: :red[{leaderboard[vkey]['HighestScore']}]")
                         elif rknt == 2: sc2.write(f"🥈 | {leaderboard[vkey]['NameCountry']}: :red[{leaderboard[vkey]['HighestScore']}]")
                         elif rknt == 3: sc3.write(f"🥈 | {leaderboard[vkey]['NameCountry']}: :red[{leaderboard[vkey]['HighestScore']}]")
+                        elif rknt == 4: sc4.write(f"🥈 | {leaderboard[vkey]['NameCountry']}: :red[{leaderboard[vkey]['HighestScore']}]") #añadí esto para mostrar al cuarto jugador
+
 
 def InitialPage():
 
@@ -182,6 +188,17 @@ def PressedCheck(vcell):  # Comprueba si el botón especificado por 'vcell' no h
         else:
             mystate.plyrbtns[vcell]['isTrueFalse'] = False
             mystate.myscore -= 1
+            mystate.wrong_attempts += 1  # Increment the wrong attempts
+
+
+            #se configuran la cantidad de turnos antes de perder el juego
+            total_attempts_allowed = mystate.GameDetails[2]**2 // 2 + 1
+            #cuando se superen estos turnos, el estado de juego cambia para así proceder a dar el mensaje de game over al usuario desde la función NewGame
+            if mystate.wrong_attempts >= total_attempts_allowed:
+                mystate.game_over = True
+                st.experimental_rerun()
+
+
 
 def ResetBoard():
      # Obtiene el número total de celdas por fila o columna desde el estado del juego.
@@ -250,36 +267,53 @@ def PreNewGame():
     mystate.plyrbtns = {}
     for vcell in range(1, ((total_cells_per_row_or_col ** 2)+1)): mystate.plyrbtns[vcell] = {'isPressed': False, 'isTrueFalse': False, 'eMoji': ''}
 
-def ScoreEmoji():
-    if mystate.myscore == 0: return '😐'
+def ScoreEmoji(): # Evalúa el puntaje actual almacenado en el estado del juego y retorna un emoji correspondiente.
+    if mystate.myscore == 0: return '😐' #puntaje regular ... 
     elif -5 <= mystate.myscore <= -1: return '😏'
     elif -10 <= mystate.myscore <= -6: return '☹️'
     elif mystate.myscore <= -11: return '😖'
     elif 1 <= mystate.myscore <= 5: return '🙂'
     elif 6 <= mystate.myscore <= 10: return '😊'
-    elif mystate.myscore > 10: return '😁'
+    elif mystate.myscore > 10: return '😁' #puntaje muy bueno
 
 def NewGame():
-    ResetBoard()
-    total_cells_per_row_or_col = mystate.GameDetails[2]
 
-    ReduceGapFromPageTop('sidebar')
-    with st.sidebar:
-        st.subheader(f"🖼️ Pix Match: {mystate.GameDetails[0]}")
-        st.markdown(horizontal_bar, True)
-
-        st.markdown(sbe.replace('|fill_variable|', mystate.sidebar_emoji), True)
-
-        aftimer = st_autorefresh(interval=(mystate.GameDetails[1] * 1000), key="aftmr")
-        if aftimer > 0: mystate.myscore -= 1
-
-        st.info(f"{ScoreEmoji()} Score: {mystate.myscore} | Pending: {(total_cells_per_row_or_col ** 2)-len(mystate.expired_cells)}")
-
-        st.markdown(horizontal_bar, True)
-        if st.button(f"🔙 Return to Main Page", use_container_width=True):
+    #verificar inicialmnete si el juego está perdido 
+    if mystate.game_over:
+        st.error("Game Over! You have made too many incorrect attempts.") #imprimir mensaje al usuario de que perdió el juego
+        if st.button("Return to Main Page"): 
+            #reiniciar las variables de estado en caso de que el usuario vuelva a la página principal para que pueda volver a jugar. 
             mystate.runpage = Main
-            st.rerun()
+            mystate.wrong_attempts = 0  
+            mystate.game_over = False  
+            mystate.expired_cells = []  
+            st.experimental_rerun()
+        return
     
+    else:
+        ResetBoard() # Reinicia y configura el tablero para una nueva partida. 
+        total_cells_per_row_or_col = mystate.GameDetails[2] # Obtiene el número total de celdas por fila o columna del estado del juego.
+
+        ReduceGapFromPageTop('sidebar') # Ajusta el espacio en la parte superior de la barra lateral.
+        with st.sidebar: # Muestra detalles del nivel de dificultad y un emoji representativo en la barra lateral.
+            st.subheader(f"🖼️ Pix Match: {mystate.GameDetails[0]}")
+            st.markdown(horizontal_bar, True)
+
+            st.markdown(sbe.replace('|fill_variable|', mystate.sidebar_emoji), True) 
+
+            aftimer = st_autorefresh(interval=(mystate.GameDetails[1] * 1000), key="aftmr") # Establece y maneja un auto-refresco basado en el intervalo de tiempo definido en la dificultad.
+            if aftimer > 0: mystate.myscore -= 1 # Penaliza el puntaje cada vez que se refresca la página automáticamente.
+    
+            # Muestra el puntaje actual y la cantidad de celdas pendientes por presionar.
+            st.info(f"{ScoreEmoji()} Score: {mystate.myscore} | Pending: {(total_cells_per_row_or_col ** 2)-len(mystate.expired_cells)}") 
+
+            st.markdown(horizontal_bar, True)
+            if st.button(f"🔙 Return to Main Page", use_container_width=True): # Si se presiona el botón, se regresa a la página principal y se reinicia el juego.
+                mystate.runpage = Main
+                st.rerun()
+    
+
+    # Maneja la lectura del tablero de líderes.
     Leaderboard('read')
     st.subheader("Picture Positions:")
     st.markdown(horizontal_bar, True)
@@ -287,14 +321,21 @@ def NewGame():
     # Set Board Dafaults
     st.markdown("<style> div[class^='css-1vbkxwb'] > p { font-size: 1.5rem; } </style> ", unsafe_allow_html=True)  # make button face big
 
-    for i in range(1, (total_cells_per_row_or_col+1)):
-        tlst = ([1] * total_cells_per_row_or_col) + [2] # 2 = rt side padding
+
+    # Prepara y muestra el tablero de juego.
+    for i in range(1, (total_cells_per_row_or_col+1)): # Itera sobre cada fila del tablero para configurar las columnas
+        # Define la configuración de las columnas para cada fila, añadiendo padding derecho para separación visual
+        tlst = ([1] * total_cells_per_row_or_col) + [2] # 2 = # [2] es para el padding derecho.
+        # Almacena la configuración de las columnas en una variable global por fila
         globals()['cols' + str(i)] = st.columns(tlst)
     
-    for vcell in range(1, (total_cells_per_row_or_col ** 2)+1):
+    # Itera sobre cada celda del tablero para asignar botones y manejar eventos
+    for vcell in range(1, (total_cells_per_row_or_col ** 2)+1): # Determina la fila a la que pertenece la celda actual basándose en su índice
         if 1 <= vcell <= (total_cells_per_row_or_col * 1):
             arr_ref = '1'
             mval = 0
+        # Repite las condiciones para asignar correctamente las celdas a las filas
+        # Continúa para todas las filas necesarias hasta cubrir el tablero completo
 
         elif ((total_cells_per_row_or_col * 1)+1) <= vcell <= (total_cells_per_row_or_col * 2):
             arr_ref = '2'
@@ -332,62 +373,83 @@ def NewGame():
             arr_ref = '10'
             mval = (total_cells_per_row_or_col * 9)
             
+
+        # Limpia el contenido previo antes de asignar un nuevo botón o emoji
         globals()['cols' + arr_ref][vcell-mval] = globals()['cols' + arr_ref][vcell-mval].empty()
-        if mystate.plyrbtns[vcell]['isPressed'] == True:
-            if mystate.plyrbtns[vcell]['isTrueFalse'] == True:
+        if mystate.plyrbtns[vcell]['isPressed'] == True:  # Si la celda ha sido presionada, muestra el resultado de esa acción
+            if mystate.plyrbtns[vcell]['isTrueFalse'] == True: # Muestra un emoji de verificación si la selección fue correcta
                 globals()['cols' + arr_ref][vcell-mval].markdown(pressed_emoji.replace('|fill_variable|', '✅️'), True)
             
-            elif mystate.plyrbtns[vcell]['isTrueFalse'] == False:
+            elif mystate.plyrbtns[vcell]['isTrueFalse'] == False: # Muestra un emoji de error si la selección fue incorrecta
                 globals()['cols' + arr_ref][vcell-mval].markdown(pressed_emoji.replace('|fill_variable|', '❌'), True)
 
-        else:
+        else: # Asigna el emoji correspondiente al botón si aún no ha sido presionado
             vemoji = mystate.plyrbtns[vcell]['eMoji']
             globals()['cols' + arr_ref][vcell-mval].button(vemoji, on_click=PressedCheck, args=(vcell, ), key=f"B{vcell}")
 
+
+    # Espacio adicional para mejorar la disposición visual en la interfaz
     st.caption('') # vertical filler
     st.markdown(horizontal_bar, True)
 
+    # Finaliza el juego si todas las celdas han sido presionadas y procede con la lógica de conclusión
     if len(mystate.expired_cells) == (total_cells_per_row_or_col ** 2):
-        Leaderboard('write')
-
+        Leaderboard('write') # Registra los resultados en el tablero de líderes
+        # Muestra animaciones según el resultado final del puntaje
         if mystate.myscore > 0: st.balloons()
         elif mystate.myscore <= 0: st.snow()
-
+        # Pausa antes de reiniciar la página principal
         tm.sleep(5)
         mystate.runpage = Main
         st.rerun()
 
 def Main():
-    st.markdown('<style>[data-testid="stSidebar"] > div:first-child {width: 310px;}</style>', unsafe_allow_html=True,)  # reduce sidebar width
+    # Aplica CSS personalizado para reducir el ancho de la barra lateral, mejora la presentación visual.
+    st.markdown('<style>[data-testid="stSidebar"] > div:first-child {width: 310px;}</style>', unsafe_allow_html=True)
+
+    # Aplica colores personalizados a los botones definidos en el estilo global `purple_btn_colour`.
     st.markdown(purple_btn_colour, unsafe_allow_html=True)
 
+    # Llama a la función `InitialPage()` que configura la página inicial del juego con instrucciones y opciones.
     InitialPage()
+
+    # Bloque para configurar elementos interactivos en la barra lateral.
     with st.sidebar:
-        mystate.GameDetails[0] = st.radio('Difficulty Level:', options=('Easy', 'Medium', 'Hard'), index=1, horizontal=True, )
+        # Opción para seleccionar el nivel de dificultad del juego, con 'Medium' como opción predeterminada.
+        mystate.GameDetails[0] = st.radio('Difficulty Level:', options=('Easy', 'Medium', 'Hard'), index=1, horizontal=True)
+
+        # Campo para que el jugador ingrese su nombre y país, usado en el tablero de líderes.
         mystate.GameDetails[3] = st.text_input("Player Name, Country", placeholder='Shawn Pereira, India', help='Optional input only for Leaderboard')
 
+        # Botón para iniciar un nuevo juego. Al hacer clic, se configuran detalles específicos del juego basados en la dificultad.
         if st.button(f"🕹️ New Game", use_container_width=True):
-
+            # Configuración del intervalo de tiempo y la cantidad de celdas según la dificultad elegida.
             if mystate.GameDetails[0] == 'Easy':
-                mystate.GameDetails[1] = 8         # secs interval
-                mystate.GameDetails[2] = 6         # total_cells_per_row_or_col
-            
+                mystate.GameDetails[1] = 8  # Intervalo en segundos para la dificultad Fácil.
+                mystate.GameDetails[2] = 6  # Total de celdas por fila/columna para Fácil.
             elif mystate.GameDetails[0] == 'Medium':
-                mystate.GameDetails[1] = 6         # secs interval
-                mystate.GameDetails[2] = 7         # total_cells_per_row_or_col
-            
+                mystate.GameDetails[1] = 6  # Intervalo para Media.
+                mystate.GameDetails[2] = 7  # Celdas para Media.
             elif mystate.GameDetails[0] == 'Hard':
-                mystate.GameDetails[1] = 5         # secs interval
-                mystate.GameDetails[2] = 8         # total_cells_per_row_or_col
+                mystate.GameDetails[1] = 5  # Intervalo para Difícil.
+                mystate.GameDetails[2] = 8  # Celdas para Difícil.
 
+            # Crea un nuevo tablero de líderes para la sesión actual si es necesario.
             Leaderboard('create')
 
+            # Prepara el juego para una nueva partida, configurando el tablero y los estados necesarios.
             PreNewGame()
+
+            # Establece `NewGame` como la próxima página a ejecutar y refresca la página para iniciar el juego.
             mystate.runpage = NewGame
             st.rerun()
 
+        # Añade una barra horizontal para separar visualmente las secciones de la barra lateral.
         st.markdown(horizontal_bar, True)
 
+# Verifica si `runpage` está definido en el estado del juego, si no, lo establece a `Main`.
+if 'runpage' not in mystate:
+    mystate.runpage = Main
 
-if 'runpage' not in mystate: mystate.runpage = Main
+# Ejecuta la función asignada a `runpage`, que inicialmente es `Main`, para cargar la página principal.
 mystate.runpage()
