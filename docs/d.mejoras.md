@@ -45,3 +45,32 @@ Detalla en este markdown lo siguiente:
 - **Métodos Importantes:** Enumera los métodos principales para cada clase. Incluye una descripción de cuál sería la utilidad de cada método
 - **Imagen del UML del diagrama de clases**  Adjunta una imagen del UML del diagrama de clases como una forma visual de planificar y entender la estructura de las clases, métodos, atributos y relaciones que podría tener una versión mejorada del código fuente.
 - **Organización de archivos:** Propon una estructura de organización de los archivos de este proyecto para que no queden todos en la raiz principal. Investiga cuáles podrían ser buenas formas de organizar los directorios y a partir de tu investigación indica qué directorios crearías y cómo los organizarías. 
+
+
+# Propuesta de mejora usando POO:
+
+- Clases a definir: Podrías crear una clase "Game" que gestione el estado del juego, lo cual incluiría las celdas expiradas, el puntaje actual, los emojis de los botones, entre otros. Esto ayudaría a centralizar el manejo del estado y facilitaría su manipulación y lectura.
+Esta clase tendría el metodo de "reset" el cuál devolvería todos los atributos a su estado inicial. 
+
+
+- Clase de interfaz de usuario: Esta clase podría manejar toda la lógica de presentación y las interacciones del usuario. Esto incluiría mostrar las páginas, botones y manejar las respuestas a las acciones del usuario.
+Su atributo será game_state: Referencia al estado del juego que esta interfaz de usuario gestionará. Todos sus metodos serán para gestionar la interfaz con la que interactuará el usuario.
+
+
+- Clase de integración: Un controlador que conecte la interfaz de usuario y el estado del juego podría ser útil para separar la lógica de negocio del código de la interfaz de usuario, lo cual es una buena práctica.
+
+Los atributos que tendrá esta clase serán los de estado (referentes a la clase "Game") y el atributo de interfaz gráfica. 
+
+Sus metodos serán los sigueintes:
+start_new_game(): Inicia un nuevo juego reseteando el estado y mostrando la página inicial.
+player_selects(cell_id): Maneja la selección de una celda por parte del jugador y actualiza la UI y el estado según sea necesario.
+
+# Ventajas de esta implementación frente al código existete: 
+
+La implementación propuesta utilizando clases ofrece varias ventajas sobre el código inicial. Primero, mejora la claridad y organización del código al separar claramente las responsabilidades: la gestión del estado del juego, la lógica de control, y la interfaz de usuario. Esto facilita la comprensión y el mantenimiento del código, ya que cada clase se enfoca en una funcionalidad específica, reduciendo la complejidad y mejorando la legibilidad.
+
+Además, esta estructura mejora la escalabilidad del proyecto. Con clases bien definidas, es más fácil modificar una parte del código sin afectar las demás. Por ejemplo, se pueden añadir nuevas características o ajustar la lógica de juego con cambios mínimos en las otras secciones del código.
+
+# Posibles desventajas:
+
+El tiempo crenado la aplicación ya que aún no sé mucho de streamlit. 
